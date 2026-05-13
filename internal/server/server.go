@@ -53,12 +53,8 @@ func (s *Server) Handler() http.Handler {
 	return r
 }
 
-// Placeholder handlers — real implementations land in T17/T18.
-func (s *Server) handleCover(w http.ResponseWriter, _ *http.Request)           { http.Error(w, "not yet implemented (T17)", http.StatusNotImplemented) }
-func (s *Server) handleCoverStandalone(w http.ResponseWriter, _ *http.Request) { http.Error(w, "not yet implemented (T17)", http.StatusNotImplemented) }
-func (s *Server) handleFile(w http.ResponseWriter, _ *http.Request)            { http.Error(w, "not yet implemented (T17)", http.StatusNotImplemented) }
-func (s *Server) handleFileStandalone(w http.ResponseWriter, _ *http.Request)  { http.Error(w, "not yet implemented (T17)", http.StatusNotImplemented) }
-func (s *Server) handleRequestsStub(w http.ResponseWriter, _ *http.Request)    { http.Error(w, "not yet implemented (T18)", http.StatusNotImplemented) }
+// Placeholder handlers — real implementations land in T18.
+func (s *Server) handleRequestsStub(w http.ResponseWriter, _ *http.Request) { http.Error(w, "not yet implemented (T18)", http.StatusNotImplemented) }
 func (s *Server) handleAdminScan(w http.ResponseWriter, _ *http.Request)       { http.Error(w, "not yet implemented (T19)", http.StatusNotImplemented) }
 func (s *Server) handleAdminScanStatus(w http.ResponseWriter, _ *http.Request) { http.Error(w, "not yet implemented (T18)", http.StatusNotImplemented) }
 func (s *Server) handleAdminListPaths(w http.ResponseWriter, _ *http.Request)  { http.Error(w, "not yet implemented (T18)", http.StatusNotImplemented) }
