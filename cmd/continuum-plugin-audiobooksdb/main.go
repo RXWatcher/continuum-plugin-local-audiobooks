@@ -243,8 +243,8 @@ func main() {
 			return "us"
 		}
 
-		metaSrv.Aggregator = agg
-		metaSrv.Registry = reg
+		metaSrv.SetAggregator(agg)
+		metaSrv.SetRegistry(reg)
 		metaSrv.Enabled = enabledFn
 		metaSrv.Region = regionFn
 

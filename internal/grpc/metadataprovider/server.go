@@ -5,6 +5,7 @@ package metadataprovider
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 
 	pluginv1 "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginproto/continuum/plugin/v1"
 	"google.golang.org/grpc/codes"
@@ -36,14 +37,49 @@ type SourceLookup interface {
 // Server implements pluginv1.MetadataProviderServer.
 type Server struct {
 	pluginv1.UnimplementedMetadataProviderServer
-	Aggregator MetadataAggregator
-	Registry   SourceLookup
-	Enabled    EnabledFn
-	Region     RegionFn
+
+	agg atomic.Pointer[MetadataAggregator]
+	reg atomic.Pointer[SourceLookup]
+
+	Enabled EnabledFn
+	Region  RegionFn
+}
+
+// SetAggregator atomically swaps the aggregator. Called from main.go's Configure callback.
+func (s *Server) SetAggregator(a MetadataAggregator) {
+	s.agg.Store(&a)
+}
+
+// SetRegistry atomically swaps the source lookup. Called from main.go's Configure callback.
+func (s *Server) SetRegistry(r SourceLookup) {
+	s.reg.Store(&r)
+}
+
+// aggregator loads the current aggregator atomically.
+func (s *Server) aggregator() MetadataAggregator {
+	p := s.agg.Load()
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
+// registry loads the current source lookup atomically.
+func (s *Server) registry() SourceLookup {
+	p := s.reg.Load()
+	if p == nil {
+		return nil
+	}
+	return *p
 }
 
 // Search handles metadata search requests, filtering to audiobooks only.
 func (s *Server) Search(ctx context.Context, req *pluginv1.SearchMetadataRequest) (*pluginv1.SearchMetadataResponse, error) {
+	agg := s.aggregator()
+	if agg == nil {
+		return nil, status.Error(codes.Unavailable, "server not configured yet")
+	}
+
 	// Audiobooks-only scope: reject non-audiobook item types.
 	if t := req.GetItemType(); t != "" && t != "audiobook" {
 		return &pluginv1.SearchMetadataResponse{}, nil
@@ -54,7 +90,7 @@ func (s *Server) Search(ctx context.Context, req *pluginv1.SearchMetadataRequest
 		return nil, status.Error(codes.InvalidArgument, "query must not be empty")
 	}
 
-	matches, err := s.Aggregator.Search(ctx, query, s.Region(), s.Enabled(), nil)
+	matches, err := agg.Search(ctx, query, s.Region(), s.Enabled(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -80,12 +116,17 @@ func (s *Server) Search(ctx context.Context, req *pluginv1.SearchMetadataRequest
 
 // GetMetadata fetches full metadata for a single audiobook by provider ID.
 func (s *Server) GetMetadata(ctx context.Context, req *pluginv1.GetMetadataRequest) (*pluginv1.GetMetadataResponse, error) {
+	reg := s.registry()
+	if reg == nil {
+		return nil, status.Error(codes.Unavailable, "server not configured yet")
+	}
+
 	id := req.GetProviderId()
 	if id == "" {
 		return nil, status.Error(codes.InvalidArgument, "provider_id must not be empty")
 	}
 
-	src, nativeID, err := parseAndLookup(s.Registry, id)
+	src, nativeID, err := parseAndLookup(reg, id)
 	if err != nil {
 		return nil, err
 	}
@@ -110,12 +151,17 @@ func (s *Server) GetMetadata(ctx context.Context, req *pluginv1.GetMetadataReque
 
 // GetImages returns poster images for a single audiobook by provider ID.
 func (s *Server) GetImages(ctx context.Context, req *pluginv1.GetImagesRequest) (*pluginv1.GetImagesResponse, error) {
+	reg := s.registry()
+	if reg == nil {
+		return nil, status.Error(codes.Unavailable, "server not configured yet")
+	}
+
 	id := req.GetProviderId()
 	if id == "" {
 		return nil, status.Error(codes.InvalidArgument, "provider_id must not be empty")
 	}
 
-	src, nativeID, err := parseAndLookup(s.Registry, id)
+	src, nativeID, err := parseAndLookup(reg, id)
 	if err != nil {
 		return nil, err
 	}

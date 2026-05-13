@@ -52,16 +52,17 @@ func newServerLite() *Server {
 		Title:      "X",
 		CoverURL:   "https://example/c.jpg",
 	}}
-	return &Server{
-		Aggregator: &fakeAggregator{matches: []metadata.Match{{
-			Source:     "audnexus",
-			Confidence: 50,
-			Candidate:  metadata.Candidate{Source: "audnexus", ExternalID: "B0EXAMPLE", Title: "X"},
-		}}},
-		Registry: &fakeRegistry{s: src},
-		Enabled:  func() map[string]bool { return map[string]bool{"audnexus": true} },
-		Region:   func() string { return "us" },
+	s := &Server{
+		Enabled: func() map[string]bool { return map[string]bool{"audnexus": true} },
+		Region:  func() string { return "us" },
 	}
+	s.SetAggregator(&fakeAggregator{matches: []metadata.Match{{
+		Source:     "audnexus",
+		Confidence: 50,
+		Candidate:  metadata.Candidate{Source: "audnexus", ExternalID: "B0EXAMPLE", Title: "X"},
+	}}})
+	s.SetRegistry(&fakeRegistry{s: src})
+	return s
 }
 
 func TestServer_GetMetadata_HappyPath(t *testing.T) {
