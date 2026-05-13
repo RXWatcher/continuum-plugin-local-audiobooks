@@ -38,11 +38,10 @@ type SourceLookup interface {
 type Server struct {
 	pluginv1.UnimplementedMetadataProviderServer
 
-	agg atomic.Pointer[MetadataAggregator]
-	reg atomic.Pointer[SourceLookup]
-
-	Enabled EnabledFn
-	Region  RegionFn
+	agg     atomic.Pointer[MetadataAggregator]
+	reg     atomic.Pointer[SourceLookup]
+	enabled atomic.Pointer[EnabledFn]
+	region  atomic.Pointer[RegionFn]
 }
 
 // SetAggregator atomically swaps the aggregator. Called from main.go's Configure callback.
@@ -53,6 +52,16 @@ func (s *Server) SetAggregator(a MetadataAggregator) {
 // SetRegistry atomically swaps the source lookup. Called from main.go's Configure callback.
 func (s *Server) SetRegistry(r SourceLookup) {
 	s.reg.Store(&r)
+}
+
+// SetEnabled atomically swaps the enabled function. Called from main.go's Configure callback.
+func (s *Server) SetEnabled(fn EnabledFn) {
+	s.enabled.Store(&fn)
+}
+
+// SetRegion atomically swaps the region function. Called from main.go's Configure callback.
+func (s *Server) SetRegion(fn RegionFn) {
+	s.region.Store(&fn)
 }
 
 // aggregator loads the current aggregator atomically.
@@ -73,6 +82,24 @@ func (s *Server) registry() SourceLookup {
 	return *p
 }
 
+// enabledFn loads the enabled function atomically.
+func (s *Server) enabledFn() map[string]bool {
+	p := s.enabled.Load()
+	if p == nil {
+		return nil
+	}
+	return (*p)()
+}
+
+// regionFn loads the region function atomically.
+func (s *Server) regionFn() string {
+	p := s.region.Load()
+	if p == nil {
+		return "us"
+	}
+	return (*p)()
+}
+
 // Search handles metadata search requests, filtering to audiobooks only.
 func (s *Server) Search(ctx context.Context, req *pluginv1.SearchMetadataRequest) (*pluginv1.SearchMetadataResponse, error) {
 	agg := s.aggregator()
@@ -90,7 +117,30 @@ func (s *Server) Search(ctx context.Context, req *pluginv1.SearchMetadataRequest
 		return nil, status.Error(codes.InvalidArgument, "query must not be empty")
 	}
 
-	matches, err := agg.Search(ctx, query, s.Region(), s.Enabled(), nil)
+	// Build a synthetic Candidate from any provider_ids supplied by the caller
+	// so the confidence scorer can award ASIN/ISBN/author/narrator bonus points.
+	var original *metadata.Candidate
+	if pids := req.GetProviderIds(); pids != nil {
+		pm := pids.AsMap()
+		c := &metadata.Candidate{}
+		if v, ok := pm["asin"].(string); ok && v != "" {
+			c.ASIN = v
+		}
+		if v, ok := pm["isbn"].(string); ok && v != "" {
+			c.ISBN = v
+		}
+		if v, ok := pm["author"].(string); ok && v != "" {
+			c.Authors = []string{v}
+		}
+		if v, ok := pm["narrator"].(string); ok && v != "" {
+			c.Narrators = []string{v}
+		}
+		if c.ASIN != "" || c.ISBN != "" || len(c.Authors) > 0 || len(c.Narrators) > 0 {
+			original = c
+		}
+	}
+
+	matches, err := agg.Search(ctx, query, s.regionFn(), s.enabledFn(), original)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +181,7 @@ func (s *Server) GetMetadata(ctx context.Context, req *pluginv1.GetMetadataReque
 		return nil, err
 	}
 
-	cand, err := src.Get(ctx, nativeID, s.Region())
+	cand, err := src.Get(ctx, nativeID, s.regionFn())
 	if err != nil {
 		if errors.Is(err, sources.ErrNotFound) {
 			return &pluginv1.GetMetadataResponse{}, nil
@@ -166,7 +216,7 @@ func (s *Server) GetImages(ctx context.Context, req *pluginv1.GetImagesRequest) 
 		return nil, err
 	}
 
-	cand, err := src.Get(ctx, nativeID, s.Region())
+	cand, err := src.Get(ctx, nativeID, s.regionFn())
 	if err != nil {
 		if errors.Is(err, sources.ErrNotFound) {
 			return &pluginv1.GetImagesResponse{}, nil

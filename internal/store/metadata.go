@@ -32,6 +32,21 @@ func (s *Store) LoadAudiobookRow(ctx context.Context, id string) (metadata.Audio
 	return r, err
 }
 
+// BulkEnqueueBackfill inserts one metadata_enrichment_job row per non-deleted
+// audiobook that does not already have one, in a single SQL statement.
+// Returns the number of rows inserted.
+func (s *Store) BulkEnqueueBackfill(ctx context.Context) (int64, error) {
+	tag, err := s.pool.Exec(ctx, `
+		INSERT INTO metadata_enrichment_job (audiobook_id)
+		SELECT id FROM audiobook WHERE deleted = FALSE
+		ON CONFLICT DO NOTHING
+	`)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 // ListPendingBackfill returns IDs of audiobooks that have no enrichment job yet.
 func (s *Store) ListPendingBackfill(ctx context.Context) ([]string, error) {
 	rows, err := s.pool.Query(ctx, `

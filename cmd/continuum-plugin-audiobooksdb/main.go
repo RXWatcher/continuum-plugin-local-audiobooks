@@ -55,6 +55,7 @@ func main() {
 		cfgPtr           atomic.Pointer[pluginrt.Config]
 		workerPtr        atomic.Pointer[metadata.EnrichmentWorker]
 		queuePtr         atomic.Pointer[metadata.Queue]
+		cachePtr         atomic.Pointer[metadata.Cache]
 	)
 
 	scanMu := sync.Mutex{}
@@ -100,6 +101,13 @@ func main() {
 				if drainErr := w.Drain(ctx); drainErr != nil {
 					logger.Warn("inline enrichment drain", "err", drainErr)
 				}
+			}
+		}
+		// Evict stale metadata cache entries after every scan. Best-effort:
+		// errors are logged at Warn but do not fail the scan.
+		if cache := cachePtr.Load(); cache != nil {
+			if _, evictErr := cache.EvictExpired(ctx); evictErr != nil {
+				logger.Warn("metadata cache eviction", "err", evictErr)
 			}
 		}
 		return eventID, nil
@@ -157,6 +165,7 @@ func main() {
 
 		ttl := time.Duration(cfg.MetadataCacheTTLDays) * 24 * time.Hour
 		cache := metadata.NewCache(p, ttl)
+		cachePtr.Store(cache)
 		aggRegAdapter := newAggregatorRegistryAdapter(reg)
 		agg := metadata.NewAggregator(aggRegAdapter, cache, cfg.MetadataRateLimitRPS)
 
@@ -245,8 +254,8 @@ func main() {
 
 		metaSrv.SetAggregator(agg)
 		metaSrv.SetRegistry(reg)
-		metaSrv.Enabled = enabledFn
-		metaSrv.Region = regionFn
+		metaSrv.SetEnabled(enabledFn)
+		metaSrv.SetRegion(regionFn)
 
 		logger.Info("configured",
 			"library_paths", cfg.LibraryPaths,

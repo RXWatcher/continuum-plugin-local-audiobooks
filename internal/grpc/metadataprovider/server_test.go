@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	pluginv1 "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginproto/continuum/plugin/v1"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/ContinuumApp/continuum-plugin-audiobooksdb/internal/metadata"
 	"github.com/ContinuumApp/continuum-plugin-audiobooksdb/internal/metadata/sources"
@@ -45,6 +46,16 @@ func (a *fakeAggregator) Search(_ context.Context, _, _ string, _ map[string]boo
 	return a.matches, nil
 }
 
+// capturingAggregator captures the original argument passed to Search.
+type capturingAggregator struct {
+	capturedOriginal *metadata.Candidate
+}
+
+func (a *capturingAggregator) Search(_ context.Context, _, _ string, _ map[string]bool, original *metadata.Candidate) ([]metadata.Match, error) {
+	a.capturedOriginal = original
+	return nil, nil
+}
+
 func newServerLite() *Server {
 	src := &fakeSrc{id: "audnexus", cand: &metadata.Candidate{
 		Source:     "audnexus",
@@ -52,10 +63,9 @@ func newServerLite() *Server {
 		Title:      "X",
 		CoverURL:   "https://example/c.jpg",
 	}}
-	s := &Server{
-		Enabled: func() map[string]bool { return map[string]bool{"audnexus": true} },
-		Region:  func() string { return "us" },
-	}
+	s := &Server{}
+	s.SetEnabled(func() map[string]bool { return map[string]bool{"audnexus": true} })
+	s.SetRegion(func() string { return "us" })
 	s.SetAggregator(&fakeAggregator{matches: []metadata.Match{{
 		Source:     "audnexus",
 		Confidence: 50,
@@ -152,5 +162,60 @@ func TestServer_Search_HappyPath(t *testing.T) {
 	}
 	if len(resp.GetResults()) != 1 {
 		t.Errorf("expected 1 result, got %d", len(resp.GetResults()))
+	}
+}
+
+// TestServer_Search_ProviderIDs_OriginalCandidate verifies that when
+// req.ProviderIds contains an ASIN, Search is called with a non-nil original
+// so the confidence scorer can award ASIN-match bonus points.
+func TestServer_Search_ProviderIDs_OriginalCandidate(t *testing.T) {
+	cap := &capturingAggregator{}
+	s := &Server{}
+	s.SetEnabled(func() map[string]bool { return nil })
+	s.SetRegion(func() string { return "us" })
+	s.SetAggregator(cap)
+
+	pids, err := structpb.NewStruct(map[string]any{"asin": "B0TESTVALUE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.Search(context.Background(), &pluginv1.SearchMetadataRequest{
+		Query:       "some audiobook",
+		ItemType:    "audiobook",
+		ProviderIds: pids,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cap.capturedOriginal == nil {
+		t.Fatal("expected non-nil original to be passed to agg.Search")
+	}
+	if cap.capturedOriginal.ASIN != "B0TESTVALUE" {
+		t.Errorf("expected ASIN %q, got %q", "B0TESTVALUE", cap.capturedOriginal.ASIN)
+	}
+}
+
+// TestServer_Search_ProviderIDs_NoSignals verifies that when provider_ids
+// contains no recognized fields, original remains nil (no spurious candidate).
+func TestServer_Search_ProviderIDs_NoSignals(t *testing.T) {
+	cap := &capturingAggregator{}
+	s := &Server{}
+	s.SetEnabled(func() map[string]bool { return nil })
+	s.SetRegion(func() string { return "us" })
+	s.SetAggregator(cap)
+
+	pids, err := structpb.NewStruct(map[string]any{"unknown_key": "irrelevant"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.Search(context.Background(), &pluginv1.SearchMetadataRequest{
+		Query:       "some audiobook",
+		ProviderIds: pids,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cap.capturedOriginal != nil {
+		t.Errorf("expected nil original when no recognized fields present, got %+v", cap.capturedOriginal)
 	}
 }
