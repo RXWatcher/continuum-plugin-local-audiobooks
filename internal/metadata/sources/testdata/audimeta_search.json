@@ -1,0 +1,26 @@
+{
+  "results": [
+    {
+      "asin": "B08G9PRS1K",
+      "title": "Project Hail Mary",
+      "subtitle": "",
+      "authors": [{"name": "Andy Weir"}],
+      "narrators": [{"name": "Ray Porter"}],
+      "image": "https://example/cover.jpg",
+      "releaseDate": "2021-05-04",
+      "runtimeLengthMin": 970,
+      "seriesPrimary": {"name": "Hail Mary", "position": "1"}
+    },
+    {
+      "asin": "B002V02ZVW",
+      "title": "The Martian",
+      "subtitle": "",
+      "authors": [{"name": "Andy Weir"}],
+      "narrators": [{"name": "R.C. Bray"}],
+      "image": "https://example/cover2.jpg",
+      "releaseDate": "2013-03-11",
+      "runtimeLengthMin": 492
+    }
+  ],
+  "total": 2
+}

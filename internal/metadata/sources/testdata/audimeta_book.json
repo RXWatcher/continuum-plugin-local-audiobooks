@@ -1,0 +1,15 @@
+{
+  "asin": "B08G9PRS1K",
+  "title": "Project Hail Mary",
+  "subtitle": "",
+  "description": "A lone astronaut.",
+  "image": "https://example/cover.jpg",
+  "language": "english",
+  "publisher": "Audible Studios",
+  "releaseDate": "2021-05-04",
+  "runtimeLengthMin": 970,
+  "authors": [{"name": "Andy Weir"}],
+  "narrators": [{"name": "Ray Porter"}],
+  "genres": [{"name": "Science Fiction", "type": "genre"}],
+  "seriesPrimary": {"name": "Hail Mary", "position": "1"}
+}
