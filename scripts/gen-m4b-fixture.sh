@@ -57,3 +57,18 @@ ffmpeg -y \
 
 rm -f "$META" "$TMP_AUDIO"
 echo "Generated: $CHAP_OUT"
+
+# MP3 fixture for ParseMP3 tests. 1-second MP3 silence + ID3v2 tags.
+MP3_OUT="internal/scanner/testdata/minimal.mp3"
+ffmpeg -y \
+  -f lavfi -i anullsrc=channel_layout=mono:sample_rate=22050 -t 1 \
+  -metadata title="Minimal MP3 Test" \
+  -metadata artist="Test Narrator" \
+  -metadata album_artist="Test Author" \
+  -metadata album="Minimal MP3 Album" \
+  -metadata date="2024" \
+  -metadata genre="Science Fiction" \
+  -c:a libmp3lame -b:a 32k -id3v2_version 3 \
+  "$MP3_OUT"
+
+echo "Generated: $MP3_OUT"
