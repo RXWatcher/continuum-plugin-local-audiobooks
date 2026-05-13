@@ -104,3 +104,61 @@ func TestAudiMeta_SearchByASIN(t *testing.T) {
 		t.Errorf("asin %q", cs[0].ASIN)
 	}
 }
+
+// newAudiMetaFakeWithSearch creates a fake server that returns the given body
+// for any /search request. Used to test different envelope shapes.
+func newAudiMetaFakeWithSearch(t *testing.T, searchBody []byte) (*httptest.Server, *AudiMeta) {
+	t.Helper()
+	book := loadFixture(t, "audimeta_book.json")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/books/B08G9PRS1K":
+			w.Write(book)
+		case strings.HasPrefix(r.URL.Path, "/search"):
+			w.Write(searchBody)
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	a := NewAudiMetaAt(srv.URL, "test")
+	a.http.Client = srv.Client()
+	return srv, a
+}
+
+func TestAudiMeta_SearchEnvelopeShapes(t *testing.T) {
+	item := `{"asin":"B08G9PRS1K","title":"Project Hail Mary","authors":[{"name":"Andy Weir"}]}`
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"books key", `{"books":[` + item + `]}`},
+		{"items key", `{"items":[` + item + `]}`},
+		{"data key", `{"data":[` + item + `]}`},
+		{"raw array", `[` + item + `]`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, a := newAudiMetaFakeWithSearch(t, []byte(tc.body))
+			defer srv.Close()
+			cs, err := a.Search(context.Background(), "Project Hail Mary", "us")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(cs) < 1 {
+				t.Fatalf("got 0 candidates, want ≥1")
+			}
+			if cs[0].Title != "Project Hail Mary" {
+				t.Errorf("title %q", cs[0].Title)
+			}
+		})
+	}
+}
+
+func TestAudiMeta_SearchUnknownEnvelopeErrors(t *testing.T) {
+	srv, a := newAudiMetaFakeWithSearch(t, []byte(`{"unexpected":"shape"}`))
+	defer srv.Close()
+	_, err := a.Search(context.Background(), "something", "us")
+	if err == nil {
+		t.Fatal("expected error for unrecognized envelope shape, got nil")
+	}
+}

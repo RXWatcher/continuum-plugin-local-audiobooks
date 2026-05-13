@@ -106,6 +106,9 @@ func (a *AudiMeta) searchByTitle(ctx context.Context, query, region string) ([]m
 	if results == nil {
 		results = wrapped.Data
 	}
+	if results == nil {
+		return nil, fmt.Errorf("audimeta: search response contained no recognised key (results/books/items/data) and was not a plain array")
+	}
 	return searchResultsToCandidate(results, region), nil
 }
 
