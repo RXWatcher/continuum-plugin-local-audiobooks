@@ -25,6 +25,11 @@ type Source interface {
 }
 
 // SourceRegistry is the minimal registry surface the Aggregator needs.
+//
+// Note: sources.Registry.All() returns []sources.Source, which is a different
+// slice type from []metadata.Source even though sources.Source structurally
+// satisfies metadata.Source. Callers wiring a *sources.Registry must wrap it
+// with an adapter that converts the slice element-by-element.
 type SourceRegistry interface {
 	All() []Source
 }
@@ -32,29 +37,34 @@ type SourceRegistry interface {
 // Aggregator orchestrates parallel fan-out to registered sources, with
 // per-source rate limiting, cache lookup, and error swallowing.
 type Aggregator struct {
-	Registry SourceRegistry
-	Cache    *Cache
-	Limiters map[string]*rate.Limiter
-	LimitMu  sync.Mutex
-	Rps      int
+	registry SourceRegistry
+	cache    *Cache
+	limiters map[string]*rate.Limiter
+	limitMu  sync.Mutex
+	rps      int
 }
 
 // NewAggregator builds an Aggregator. `rps` is the per-source request budget.
+// rps is clamped to a minimum of 1 to avoid a burst=0 limiter that silently
+// drops all requests.
 func NewAggregator(reg SourceRegistry, cache *Cache, rps int) *Aggregator {
+	if rps < 1 {
+		rps = 1 // avoid silent burst=0 → all-skipped behavior
+	}
 	return &Aggregator{
-		Registry: reg, Cache: cache, Rps: rps,
-		Limiters: map[string]*rate.Limiter{},
+		registry: reg, cache: cache, rps: rps,
+		limiters: map[string]*rate.Limiter{},
 	}
 }
 
 func (a *Aggregator) limiter(sourceID string) *rate.Limiter {
-	a.LimitMu.Lock()
-	defer a.LimitMu.Unlock()
-	if l, ok := a.Limiters[sourceID]; ok {
+	a.limitMu.Lock()
+	defer a.limitMu.Unlock()
+	if l, ok := a.limiters[sourceID]; ok {
 		return l
 	}
-	l := rate.NewLimiter(rate.Limit(a.Rps), a.Rps)
-	a.Limiters[sourceID] = l
+	l := rate.NewLimiter(rate.Limit(a.rps), a.rps)
+	a.limiters[sourceID] = l
 	return l
 }
 
@@ -72,7 +82,7 @@ func (a *Aggregator) Search(ctx context.Context, query, region string,
 		out []Match
 	)
 
-	for _, s := range a.Registry.All() {
+	for _, s := range a.registry.All() {
 		if !s.Enabled(enabled) {
 			continue
 		}
@@ -103,7 +113,7 @@ func (a *Aggregator) searchOne(ctx context.Context, s Source,
 	kind := classify(query)
 	cacheKey := Key(s.ID(), kind, region, query)
 
-	if entry, err := a.Cache.Get(ctx, cacheKey); err == nil {
+	if entry, err := a.cache.Get(ctx, cacheKey); err == nil {
 		if entry.NotFound {
 			return nil
 		}
@@ -125,11 +135,11 @@ func (a *Aggregator) searchOne(ctx context.Context, s Source,
 		return nil
 	}
 	if len(cs) == 0 {
-		_ = a.Cache.PutNotFound(ctx, cacheKey, s.ID(), region)
+		_ = a.cache.PutNotFound(ctx, cacheKey, s.ID(), region)
 		return nil
 	}
 	if payload, jerr := json.Marshal(cs); jerr == nil {
-		_ = a.Cache.PutHit(ctx, cacheKey, s.ID(), region, payload)
+		_ = a.cache.PutHit(ctx, cacheKey, s.ID(), region, payload)
 	}
 	return rank(cs, query, original)
 }
