@@ -1,0 +1,11 @@
+{"resultCount":1,"results":[{
+  "trackId":123456789,
+  "trackName":"Project Hail Mary",
+  "artistName":"Andy Weir",
+  "longDescription":"A lone astronaut.",
+  "artworkUrl600":"https://example/cover-600.jpg",
+  "releaseDate":"2021-05-04T00:00:00Z",
+  "trackTimeMillis":58200000,
+  "primaryGenreName":"Science Fiction",
+  "country":"USA"
+}]}
