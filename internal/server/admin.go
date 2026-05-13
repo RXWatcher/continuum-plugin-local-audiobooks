@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -81,4 +82,23 @@ func (s *Server) handleAdminScanStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": events})
+}
+
+// handleMetadataBackfill enqueues a metadata_enrichment_job for every
+// audiobook that has no existing enrichment job. Returns {"queued": <count>}.
+func (s *Server) handleMetadataBackfill(w http.ResponseWriter, r *http.Request) {
+	if s.deps.MetadataQueue == nil {
+		http.Error(w, `{"error":"metadata queue not configured"}`, http.StatusServiceUnavailable)
+		return
+	}
+	ids, err := s.deps.Store.ListPendingBackfill(r.Context())
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusInternalServerError)
+		return
+	}
+	for _, id := range ids {
+		_ = s.deps.MetadataQueue.Enqueue(r.Context(), id) // best-effort
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]int{"queued": len(ids)})
 }

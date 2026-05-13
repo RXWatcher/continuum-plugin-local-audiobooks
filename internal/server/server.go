@@ -10,6 +10,13 @@ import (
 	"github.com/ContinuumApp/continuum-plugin-audiobooksdb/internal/store"
 )
 
+// EnrichmentQueue is the surface the server needs from metadata.Queue.
+// Declared as an interface to avoid an import cycle
+// (metadata → store, store → server would cycle).
+type EnrichmentQueue interface {
+	Enqueue(ctx context.Context, audiobookID string) error
+}
+
 // Deps holds the handler's collaborators.
 type Deps struct {
 	Store        *store.Store
@@ -20,6 +27,10 @@ type Deps struct {
 	// concurrent calls de-duplicate to the same in-flight id. Nil-safe (the
 	// admin handler returns 503 when Scan is nil).
 	Scan func(context.Context) (int64, error)
+
+	// MetadataQueue is optional. When non-nil, the /admin/metadata/backfill
+	// endpoint enqueues enrichment jobs for all audiobooks lacking one.
+	MetadataQueue EnrichmentQueue
 }
 
 // Server wraps the chi handler.
@@ -56,5 +67,6 @@ func (s *Server) Handler() http.Handler {
 	r.Get("/admin/library-paths", s.handleAdminListPaths)
 	r.Post("/admin/library-paths", s.handleAdminAddPath)
 	r.Delete("/admin/library-paths/{id}", s.handleAdminDeletePath)
+	r.Post("/admin/metadata/backfill", s.handleMetadataBackfill)
 	return r
 }

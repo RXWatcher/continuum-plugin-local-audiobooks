@@ -1,6 +1,6 @@
 {
   "plugin_id": "continuum.audiobooksdb",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "checksum": "__CHECKSUM__",
   "continuum_api_version": "v1",
   "capabilities": [
@@ -10,7 +10,22 @@
      "display_name": "Catalog + admin HTTP routes"},
     {"type": "scheduled_task.v1", "id": "library_scan",
      "display_name": "Periodic library rescan",
-     "cron": "0 */6 * * *"}
+     "cron": "0 */6 * * *"},
+    {
+      "type": "metadata_provider.v1",
+      "id": "audiobooksdb_meta",
+      "display_name": "Audiobook metadata aggregator",
+      "description": "Searches Audnexus, AudiMeta, iTunes, Storytel, BookBeat, Audioteka, and Audiobookcovers.",
+      "metadata": {
+        "default_priority": {"audiobook": 1}
+      }
+    },
+    {
+      "type": "scheduled_task.v1",
+      "id": "metadata_enrichment_worker",
+      "display_name": "Metadata enrichment worker",
+      "cron": "* * * * *"
+    }
   ],
   "http_routes": [
     {"id": "api",       "method": "*",   "path": "/api/v1/*", "access": "authenticated"},
@@ -46,6 +61,48 @@
       "description": "32-byte base64-encoded shared secret with the audiobooks portal. Required when standalone_http_listen is set. Used to verify presigned stream URLs.",
       "json_schema": "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}}}",
       "admin_form": {"fields": [{"key": "value", "label": "Base64 secret", "control": "ADMIN_FORM_CONTROL_PASSWORD", "secret": true}]}
+    },
+    {
+      "key": "metadata_sources_enabled",
+      "title": "Enabled metadata sources",
+      "description": "JSON array of source IDs to query. Defaults to all sources.",
+      "json_schema": "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"default\":[\"audnexus\",\"audimeta\",\"itunes\",\"storytel\",\"bookbeat\",\"audioteka\",\"audiobookcovers\"]}}}",
+      "admin_form": {"fields": [{"key": "value", "label": "Source IDs (JSON array)", "control": "ADMIN_FORM_CONTROL_TEXT"}]}
+    },
+    {
+      "key": "metadata_default_region",
+      "title": "Default metadata region",
+      "description": "ISO country code used when no per-request region is supplied. Defaults to \"us\".",
+      "json_schema": "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\",\"default\":\"us\"}}}",
+      "admin_form": {"fields": [{"key": "value", "label": "Region code", "control": "ADMIN_FORM_CONTROL_TEXT"}]}
+    },
+    {
+      "key": "metadata_cache_ttl_days",
+      "title": "Metadata cache TTL (days)",
+      "description": "Number of days a positive metadata cache entry is retained. Defaults to 30.",
+      "json_schema": "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"integer\",\"default\":30}}}",
+      "admin_form": {"fields": [{"key": "value", "label": "TTL in days", "control": "ADMIN_FORM_CONTROL_TEXT"}]}
+    },
+    {
+      "key": "metadata_rate_limit_rps",
+      "title": "Metadata source rate limit (RPS)",
+      "description": "Per-source requests-per-second budget for the aggregator. Defaults to 5.",
+      "json_schema": "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"integer\",\"default\":5}}}",
+      "admin_form": {"fields": [{"key": "value", "label": "Requests per second", "control": "ADMIN_FORM_CONTROL_TEXT"}]}
+    },
+    {
+      "key": "scan_inline_enrich",
+      "title": "Inline enrichment on scan",
+      "description": "When true, metadata enrichment runs synchronously after each library scan completes. Defaults to false.",
+      "json_schema": "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"boolean\",\"default\":false}}}",
+      "admin_form": {"fields": [{"key": "value", "label": "Enable inline enrichment", "control": "ADMIN_FORM_CONTROL_CHECKBOX"}]}
+    },
+    {
+      "key": "metadata_scan_source",
+      "title": "Scan enrichment source",
+      "description": "Source ID used by the enrichment worker during scans. Defaults to \"audnexus\".",
+      "json_schema": "{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\",\"default\":\"audnexus\"}}}",
+      "admin_form": {"fields": [{"key": "value", "label": "Source ID", "control": "ADMIN_FORM_CONTROL_TEXT"}]}
     }
   ]
 }

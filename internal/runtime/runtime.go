@@ -6,6 +6,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	pluginv1 "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginproto/continuum/plugin/v1"
@@ -18,6 +19,13 @@ type Config struct {
 	LibraryPaths         []string
 	StandaloneHTTPListen string
 	StreamSigningSecret  string
+
+	MetadataSourcesEnabled []string
+	MetadataDefaultRegion  string
+	MetadataCacheTTLDays   int
+	MetadataRateLimitRPS   int
+	ScanInlineEnrich       bool
+	MetadataScanSource     string
 }
 
 // Server implements the plugin's Runtime service.
@@ -57,6 +65,18 @@ func (s *Server) Configure(_ context.Context, req *pluginv1.ConfigureRequest) (*
 			cfg.StandaloneHTTPListen = stringFrom(val)
 		case "stream_signing_secret":
 			cfg.StreamSigningSecret = stringFrom(val)
+		case "metadata_sources_enabled":
+			cfg.MetadataSourcesEnabled = stringSliceFrom(val)
+		case "metadata_default_region":
+			cfg.MetadataDefaultRegion = stringFrom(val)
+		case "metadata_cache_ttl_days":
+			cfg.MetadataCacheTTLDays = intFrom(val)
+		case "metadata_rate_limit_rps":
+			cfg.MetadataRateLimitRPS = intFrom(val)
+		case "scan_inline_enrich":
+			cfg.ScanInlineEnrich = boolFrom(val)
+		case "metadata_scan_source":
+			cfg.MetadataScanSource = stringFrom(val)
 		}
 	}
 	if cfg.DatabaseURL == "" {
@@ -67,6 +87,31 @@ func (s *Server) Configure(_ context.Context, req *pluginv1.ConfigureRequest) (*
 	}
 	if cfg.StandaloneHTTPListen != "" && cfg.StreamSigningSecret == "" {
 		return nil, errors.New("stream_signing_secret is required when standalone_http_listen is set")
+	}
+	// Apply defaults for metadata fields.
+	if cfg.MetadataDefaultRegion == "" {
+		cfg.MetadataDefaultRegion = "us"
+	}
+	if cfg.MetadataCacheTTLDays == 0 {
+		cfg.MetadataCacheTTLDays = 30
+	}
+	if cfg.MetadataRateLimitRPS == 0 {
+		cfg.MetadataRateLimitRPS = 5
+	}
+	if cfg.MetadataScanSource == "" {
+		cfg.MetadataScanSource = "audnexus"
+	}
+	if len(cfg.MetadataSourcesEnabled) == 0 {
+		cfg.MetadataSourcesEnabled = []string{
+			"audnexus", "audimeta", "itunes", "storytel", "bookbeat", "audioteka", "audiobookcovers",
+		}
+	}
+	validScanSources := map[string]bool{
+		"audnexus": true, "audimeta": true, "itunes": true,
+		"storytel": true, "bookbeat": true, "audioteka": true,
+	}
+	if !validScanSources[cfg.MetadataScanSource] {
+		return nil, fmt.Errorf("metadata_scan_source %q is not a valid scan-capable source", cfg.MetadataScanSource)
 	}
 	if s.onCfg != nil {
 		if err := s.onCfg(cfg); err != nil {
@@ -105,6 +150,25 @@ func stringSliceFrom(v any) []string {
 		}
 	}
 	return out
+}
+
+func intFrom(v any) int {
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case int:
+		return n
+	case int64:
+		return int(n)
+	}
+	return 0
+}
+
+func boolFrom(v any) bool {
+	if b, ok := v.(bool); ok {
+		return b
+	}
+	return false
 }
 
 // Compile-time check that Server satisfies the SDK interface.

@@ -19,7 +19,10 @@ import (
 	publicmanifest "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginsdk/manifest"
 	sdkruntime "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginsdk/runtime"
 
+	"github.com/ContinuumApp/continuum-plugin-audiobooksdb/internal/grpc/metadataprovider"
 	"github.com/ContinuumApp/continuum-plugin-audiobooksdb/internal/httproutes"
+	"github.com/ContinuumApp/continuum-plugin-audiobooksdb/internal/metadata"
+	"github.com/ContinuumApp/continuum-plugin-audiobooksdb/internal/metadata/sources"
 	"github.com/ContinuumApp/continuum-plugin-audiobooksdb/internal/migrate"
 	pluginrt "github.com/ContinuumApp/continuum-plugin-audiobooksdb/internal/runtime"
 	"github.com/ContinuumApp/continuum-plugin-audiobooksdb/internal/scanner"
@@ -49,6 +52,9 @@ func main() {
 		standaloneOnce   sync.Once
 		standaloneAddr   atomic.Value // string
 		standaloneSrvPtr atomic.Pointer[http.Server]
+		cfgPtr           atomic.Pointer[pluginrt.Config]
+		workerPtr        atomic.Pointer[metadata.EnrichmentWorker]
+		queuePtr         atomic.Pointer[metadata.Queue]
 	)
 
 	scanMu := sync.Mutex{}
@@ -72,8 +78,9 @@ func main() {
 				continue
 			}
 			res, walkErr := scanner.Walk(ctx, adapter, scanner.WalkParams{
-				LibraryPathID: lp.ID,
-				Root:          lp.Path,
+				LibraryPathID:   lp.ID,
+				Root:            lp.Path,
+				EnrichmentQueue: queuePtr.Load(),
 			})
 			if walkErr != nil {
 				_ = st.FinishScanEvent(ctx, eventID, totalAdded, totalChanged, totalDeleted, walkErr.Error())
@@ -85,11 +92,30 @@ func main() {
 			_ = st.MarkLibraryScanned(ctx, lp.ID)
 		}
 		_ = st.FinishScanEvent(ctx, eventID, totalAdded, totalChanged, totalDeleted, "")
+		// Inline enrichment: drain the just-enqueued jobs synchronously when
+		// scan_inline_enrich is enabled. Best-effort: drain errors are logged
+		// but do not fail the scan.
+		if c := cfgPtr.Load(); c != nil && c.ScanInlineEnrich {
+			if w := workerPtr.Load(); w != nil {
+				if drainErr := w.Drain(ctx); drainErr != nil {
+					logger.Warn("inline enrichment drain", "err", drainErr)
+				}
+			}
+		}
 		return eventID, nil
 	}
 
-	tasks := &scheduler.Tasks{ScanFn: runScan}
+	drainWorker := func(ctx context.Context) error {
+		if w := workerPtr.Load(); w != nil {
+			return w.Drain(ctx)
+		}
+		return nil
+	}
+
+	tasks := &scheduler.Tasks{ScanFn: runScan, DrainFn: drainWorker}
 	schedSrv := scheduler.New(tasks)
+
+	metaSrv := &metadataprovider.Server{}
 
 	rt := pluginrt.New(manifest, func(cfg pluginrt.Config) error {
 		ctx := context.Background()
@@ -118,11 +144,36 @@ func main() {
 			}
 		}
 
+		// Metadata wiring — build queue first so it can be passed to the HTTP server.
+		ua := "continuum-audiobooksdb/" + manifest.GetVersion()
+		reg := sources.NewRegistry()
+		reg.Register(sources.NewAudnexus(ua))
+		reg.Register(sources.NewAudiMeta(ua))
+		reg.Register(sources.NewITunes(ua))
+		reg.Register(sources.NewStorytel(ua))
+		reg.Register(sources.NewBookBeat(ua))
+		reg.Register(sources.NewAudioteka(ua))
+		reg.Register(sources.NewAudiobookCovers(ua))
+
+		ttl := time.Duration(cfg.MetadataCacheTTLDays) * 24 * time.Hour
+		cache := metadata.NewCache(p, ttl)
+		aggRegAdapter := newAggregatorRegistryAdapter(reg)
+		agg := metadata.NewAggregator(aggRegAdapter, cache, cfg.MetadataRateLimitRPS)
+
+		q := metadata.NewQueue(p)
+		workerRegAdapter := newWorkerRegistryAdapter(reg)
+		worker := metadata.NewEnrichmentWorker(q, st, workerRegAdapter,
+			cfg.MetadataScanSource, cfg.MetadataDefaultRegion, logger)
+
+		queuePtr.Store(q)
+		workerPtr.Store(worker)
+
 		// Host-proxy HTTP server: serves /api/v1/* (catalog/browse/cover/file)
-		// and /admin/* (CRUD + scan).
+		// and /admin/* (CRUD + scan + metadata backfill).
 		srv := server.New(server.Deps{
-			Store: st,
-			Scan:  runScan,
+			Store:         st,
+			Scan:          runScan,
+			MetadataQueue: q,
 		})
 		httpSrv.SetHandler(srv.Handler())
 
@@ -169,6 +220,34 @@ func main() {
 		if old := poolPtr.Swap(p); old != nil {
 			old.Close()
 		}
+
+		// Capture cfg for closures used by the gRPC server.
+		cfgCopy := cfg
+		cfgPtr.Store(&cfgCopy)
+
+		// gRPC server reads enabledFn/regionFn at request time so config
+		// changes take effect without a restart.
+		enabledFn := func() map[string]bool {
+			m := map[string]bool{}
+			if c := cfgPtr.Load(); c != nil {
+				for _, id := range c.MetadataSourcesEnabled {
+					m[id] = true
+				}
+			}
+			return m
+		}
+		regionFn := func() string {
+			if c := cfgPtr.Load(); c != nil {
+				return c.MetadataDefaultRegion
+			}
+			return "us"
+		}
+
+		metaSrv.Aggregator = agg
+		metaSrv.Registry = reg
+		metaSrv.Enabled = enabledFn
+		metaSrv.Region = regionFn
+
 		logger.Info("configured",
 			"library_paths", cfg.LibraryPaths,
 			"standalone", cfg.StandaloneHTTPListen != "")
@@ -191,9 +270,10 @@ func main() {
 	sdkruntime.Serve(sdkruntime.ServeConfig{
 		Logger: logger,
 		Servers: sdkruntime.CapabilityServers{
-			Runtime:       rt,
-			HttpRoutes:    httpSrv,
-			ScheduledTask: schedSrv,
+			Runtime:          rt,
+			HttpRoutes:       httpSrv,
+			ScheduledTask:    schedSrv,
+			MetadataProvider: metaSrv,
 		},
 	})
 }
