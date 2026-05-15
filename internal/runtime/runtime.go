@@ -82,9 +82,6 @@ func (s *Server) Configure(_ context.Context, req *pluginv1.ConfigureRequest) (*
 	if cfg.DatabaseURL == "" {
 		return nil, errors.New("database_url is required")
 	}
-	if len(cfg.LibraryPaths) == 0 {
-		return nil, errors.New("library_paths is required (non-empty array)")
-	}
 	if cfg.StandaloneHTTPListen != "" && cfg.StreamSigningSecret == "" {
 		return nil, errors.New("stream_signing_secret is required when standalone_http_listen is set")
 	}

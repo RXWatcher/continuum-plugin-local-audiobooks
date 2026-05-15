@@ -40,6 +40,26 @@ func TestConfigure_RequiresDatabaseURL(t *testing.T) {
 	}
 }
 
+func TestConfigure_AllowsEmptyLibraryPaths(t *testing.T) {
+	var got pluginrt.Config
+	s := pluginrt.New(nil, func(c pluginrt.Config) error {
+		got = c
+		return nil
+	})
+	_, err := s.Configure(context.Background(), newConfigureRequest(t, map[string]any{
+		"database_url": "postgres://x",
+	}))
+	if err != nil {
+		t.Fatalf("Configure: %v", err)
+	}
+	if got.DatabaseURL != "postgres://x" {
+		t.Errorf("DatabaseURL = %q", got.DatabaseURL)
+	}
+	if len(got.LibraryPaths) != 0 {
+		t.Errorf("LibraryPaths = %v", got.LibraryPaths)
+	}
+}
+
 func TestConfigure_ParsesAllFields(t *testing.T) {
 	var got pluginrt.Config
 	s := pluginrt.New(nil, func(c pluginrt.Config) error {

@@ -1,7 +1,7 @@
 {
   "plugin_id": "continuum.local-audiobooks",
   "version": "0.2.0",
-  "checksum": "4aeabdff668a56cabbe4755d423240a74cc5acf9e7a013d50643051405505327",
+  "checksum": "c533ae0e6de6c5427738e3866c90cc5ad170da6dd4a8033eb3cbe8199fa262c5",
   "continuum_api_version": "v1",
   "supported_platforms": [{"os": "linux", "arch": "amd64"}],
   "capabilities": [
