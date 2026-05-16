@@ -3,11 +3,14 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	goruntime "runtime"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -16,6 +19,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	pluginv1 "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginproto/continuum/plugin/v1"
 	publicmanifest "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginsdk/manifest"
 	sdkruntime "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginsdk/runtime"
 
@@ -40,6 +44,10 @@ func main() {
 	manifest, err := publicmanifest.Load(manifestRaw)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load manifest: %v\n", err)
+		os.Exit(1)
+	}
+	if err := hydrateRuntimeManifest(manifest); err != nil {
+		fmt.Fprintf(os.Stderr, "hydrate manifest: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -285,4 +293,21 @@ func main() {
 			MetadataProvider: metaSrv,
 		},
 	})
+}
+
+func hydrateRuntimeManifest(manifest *pluginv1.PluginManifest) error {
+	executablePath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolve executable path: %w", err)
+	}
+	binaryData, err := os.ReadFile(executablePath)
+	if err != nil {
+		return fmt.Errorf("read executable %q: %w", executablePath, err)
+	}
+	checksum := sha256.Sum256(binaryData)
+	manifest.Checksum = hex.EncodeToString(checksum[:])
+	if len(manifest.GetSupportedPlatforms()) == 0 {
+		manifest.SupportedPlatforms = []*pluginv1.SupportedPlatform{{Os: goruntime.GOOS, Arch: goruntime.GOARCH}}
+	}
+	return nil
 }
