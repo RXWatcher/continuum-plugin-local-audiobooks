@@ -145,15 +145,7 @@ func (s *Store) ListActiveAudiobooks(ctx context.Context, p ListAudiobooksParams
 	if p.Limit <= 0 || p.Limit > 200 {
 		p.Limit = 50
 	}
-	col := "title"
-	switch p.Sort {
-	case "author":
-		col = "author"
-	case "added":
-		col = "created_at"
-	case "updated":
-		col = "updated_at"
-	}
+	col, isTime := resolveSort(p.Sort)
 	dir := "ASC"
 	if p.Order == "desc" {
 		dir = "DESC"
@@ -162,9 +154,8 @@ func (s *Store) ListActiveAudiobooks(ctx context.Context, p ListAudiobooksParams
 	// Exclude audiobooks whose owning library path is disabled: an operator
 	// disabling a path must hide its content from catalog/search/facets.
 	whereClauses := []string{"deleted = FALSE", "library_path_id IN (SELECT id FROM library_path WHERE enabled)"}
-	if p.Cursor != "" {
-		args = append(args, p.Cursor)
-		whereClauses = append(whereClauses, fmt.Sprintf("id > $%d", len(args)))
+	if c := keysetClause(p.Cursor, col, dir, isTime, &args); c != "" {
+		whereClauses = append(whereClauses, c)
 	}
 	if p.LibraryPathID > 0 {
 		args = append(args, p.LibraryPathID)
@@ -205,12 +196,16 @@ func (s *Store) SearchAudiobooks(ctx context.Context, query string, p ListAudiob
 	if p.Limit <= 0 || p.Limit > 200 {
 		p.Limit = 50
 	}
+	col, isTime := resolveSort(p.Sort)
+	dir := "ASC"
+	if p.Order == "desc" {
+		dir = "DESC"
+	}
 	pattern := "%" + query + "%"
 	args := []any{pattern}
 	whereClauses := []string{"deleted = FALSE", "library_path_id IN (SELECT id FROM library_path WHERE enabled)", "(title ILIKE $1 OR author ILIKE $1)"}
-	if p.Cursor != "" {
-		args = append(args, p.Cursor)
-		whereClauses = append(whereClauses, fmt.Sprintf("id > $%d", len(args)))
+	if c := keysetClause(p.Cursor, col, dir, isTime, &args); c != "" {
+		whereClauses = append(whereClauses, c)
 	}
 	if p.LibraryPathID > 0 {
 		args = append(args, p.LibraryPathID)
@@ -226,8 +221,8 @@ func (s *Store) SearchAudiobooks(ctx context.Context, query string, p ListAudiob
 	args = append(args, p.Limit)
 	q := fmt.Sprintf(`SELECT %s FROM audiobook
 WHERE %s
-ORDER BY title, id
-LIMIT $%d`, audiobookCols, whereSQL, len(args))
+ORDER BY %s %s, id
+LIMIT $%d`, audiobookCols, whereSQL, col, dir, len(args))
 	rows, err := s.pool.Query(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("store.SearchAudiobooks: %w", err)

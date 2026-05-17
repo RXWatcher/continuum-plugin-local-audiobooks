@@ -137,7 +137,7 @@ func (s *Server) handleListCatalog(w http.ResponseWriter, r *http.Request) {
 		out.Items = append(out.Items, toSummary(a, libraryNames))
 	}
 	if len(books) > 0 {
-		out.NextCursor = books[len(books)-1].ID
+		out.NextCursor = store.EncodeCursor(books[len(books)-1], q.Get("sort"))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -164,7 +164,7 @@ func (s *Server) handleSearchCatalog(w http.ResponseWriter, r *http.Request) {
 		out.Items = append(out.Items, toSummary(a, libraryNames))
 	}
 	if len(books) > 0 {
-		out.NextCursor = books[len(books)-1].ID
+		out.NextCursor = store.EncodeCursor(books[len(books)-1], q.Get("sort"))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
