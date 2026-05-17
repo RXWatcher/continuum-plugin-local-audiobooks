@@ -159,7 +159,9 @@ func (s *Store) ListActiveAudiobooks(ctx context.Context, p ListAudiobooksParams
 		dir = "DESC"
 	}
 	args := []any{}
-	whereClauses := []string{"deleted = FALSE"}
+	// Exclude audiobooks whose owning library path is disabled: an operator
+	// disabling a path must hide its content from catalog/search/facets.
+	whereClauses := []string{"deleted = FALSE", "library_path_id IN (SELECT id FROM library_path WHERE enabled)"}
 	if p.Cursor != "" {
 		args = append(args, p.Cursor)
 		whereClauses = append(whereClauses, fmt.Sprintf("id > $%d", len(args)))
@@ -205,7 +207,7 @@ func (s *Store) SearchAudiobooks(ctx context.Context, query string, p ListAudiob
 	}
 	pattern := "%" + query + "%"
 	args := []any{pattern}
-	whereClauses := []string{"deleted = FALSE", "(title ILIKE $1 OR author ILIKE $1)"}
+	whereClauses := []string{"deleted = FALSE", "library_path_id IN (SELECT id FROM library_path WHERE enabled)", "(title ILIKE $1 OR author ILIKE $1)"}
 	if p.Cursor != "" {
 		args = append(args, p.Cursor)
 		whereClauses = append(whereClauses, fmt.Sprintf("id > $%d", len(args)))
@@ -249,7 +251,7 @@ func (s *Store) ListAuthorsWithCounts(ctx context.Context, cursor string, limit 
 		limit = 100
 	}
 	args := []any{}
-	whereClauses := []string{"deleted = FALSE", "author <> ''"}
+	whereClauses := []string{"deleted = FALSE", "library_path_id IN (SELECT id FROM library_path WHERE enabled)", "author <> ''"}
 	if cursor != "" {
 		args = append(args, cursor)
 		whereClauses = append(whereClauses, fmt.Sprintf("author > $%d", len(args)))
@@ -293,7 +295,7 @@ func (s *Store) ListGenresWithCounts(ctx context.Context, cursor string, limit i
 		limit = 100
 	}
 	args := []any{}
-	whereClauses := []string{"deleted = FALSE", "genre <> ''"}
+	whereClauses := []string{"deleted = FALSE", "library_path_id IN (SELECT id FROM library_path WHERE enabled)", "genre <> ''"}
 	if cursor != "" {
 		args = append(args, cursor)
 		whereClauses = append(whereClauses, fmt.Sprintf("genre > $%d", len(args)))
