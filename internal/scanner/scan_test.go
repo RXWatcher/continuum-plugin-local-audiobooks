@@ -246,3 +246,27 @@ func TestScan_NoEnqueueWhenQueueNil(t *testing.T) {
 		t.Fatalf("expected 1 added, got %d", res.Added)
 	}
 }
+
+// One corrupt/unparseable audio file must not abort the whole library scan:
+// it is logged and skipped so the rest of the library still indexes.
+func TestScan_SkipsUnparseableFileWithoutAbortingScan(t *testing.T) {
+	dir := t.TempDir()
+	good := fixtureM4B(t, "minimal.m4b")
+	if err := copyFile(good, filepath.Join(dir, "good.m4b")); err != nil {
+		t.Fatalf("copy good: %v", err)
+	}
+	// A recognised extension whose content can't be opened/parsed (dangling
+	// symlink) — must be skipped, not abort the whole scan.
+	if err := os.Symlink(filepath.Join(dir, "does-not-exist"), filepath.Join(dir, "broken.m4b")); err != nil {
+		t.Fatalf("symlink broken: %v", err)
+	}
+
+	fake := &scanFakeStore{}
+	res, err := scanner.Walk(context.Background(), fake, scanner.WalkParams{LibraryPathID: 1, Root: dir})
+	if err != nil {
+		t.Fatalf("one bad file must not abort the scan; got err=%v", err)
+	}
+	if res.Added != 1 || len(fake.books) != 1 {
+		t.Errorf("good file should still index: added=%d books=%d", res.Added, len(fake.books))
+	}
+}

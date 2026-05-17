@@ -134,7 +134,10 @@ func Walk(ctx context.Context, store ScanStore, p WalkParams) (WalkResult, error
 		}
 		info, err := d.Info()
 		if err != nil {
-			return fmt.Errorf("stat %s: %w", path, err)
+			// A single unreadable entry (e.g. a dangling symlink, a file
+			// removed mid-walk) must not abort the whole library scan.
+			slog.WarnContext(ctx, "scan: skip unstattable file", "path", path, "err", err)
+			return nil
 		}
 		mtime := info.ModTime()
 		size := info.Size()
@@ -148,7 +151,10 @@ func Walk(ctx context.Context, store ScanStore, p WalkParams) (WalkResult, error
 
 		parsed, err := parseAudio(path)
 		if err != nil {
-			return fmt.Errorf("parse %s: %w", path, err)
+			// One corrupt/unreadable audio file must not abort the scan of
+			// the entire library — log and skip it.
+			slog.WarnContext(ctx, "scan: skip unparseable file", "path", path, "err", err)
+			return nil
 		}
 		now := time.Now()
 		ab := Audiobook{
