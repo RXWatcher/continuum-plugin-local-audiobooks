@@ -97,9 +97,15 @@ ON CONFLICT (library_path_id, path) DO UPDATE SET
 	return nil
 }
 
-// GetAudiobook returns a single row by id.
+// GetAudiobook returns a single non-deleted row whose owning library path is
+// enabled. The by-id getters (file/cover/detail handlers) must apply the same
+// delete + disabled-library filter as list/search/facets, or a soft-deleted
+// or operator-disabled book stays streamable and its absolute path is
+// disclosed by id.
 func (s *Store) GetAudiobook(ctx context.Context, id string) (*Audiobook, error) {
-	q := `SELECT ` + audiobookCols + ` FROM audiobook WHERE id = $1`
+	q := `SELECT ` + audiobookCols + ` FROM audiobook
+		WHERE id = $1 AND deleted = FALSE
+		  AND library_path_id IN (SELECT id FROM library_path WHERE enabled)`
 	row := s.pool.QueryRow(ctx, q, id)
 	a, err := scanAudiobook(row)
 	if err != nil {

@@ -31,7 +31,16 @@ ON CONFLICT (audiobook_id) DO UPDATE SET
 }
 
 func (s *Store) GetCover(ctx context.Context, audiobookID string) (*Cover, error) {
-	const q = `SELECT audiobook_id, content_type, bytes, source FROM cover WHERE audiobook_id = $1`
+	// Only serve covers for a non-deleted book in an enabled library, so a
+	// soft-deleted / disabled book's cover isn't retrievable by id (matches
+	// GetAudiobook).
+	const q = `SELECT audiobook_id, content_type, bytes, source FROM cover
+		WHERE audiobook_id = $1
+		  AND audiobook_id IN (
+		      SELECT id FROM audiobook
+		      WHERE deleted = FALSE
+		        AND library_path_id IN (SELECT id FROM library_path WHERE enabled)
+		  )`
 	row := s.pool.QueryRow(ctx, q, audiobookID)
 	c := &Cover{}
 	err := row.Scan(&c.AudiobookID, &c.ContentType, &c.Bytes, &c.Source)
