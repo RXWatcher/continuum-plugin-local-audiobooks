@@ -2,6 +2,7 @@ package runtime_test
 
 import (
 	"context"
+	"encoding/base64"
 	"testing"
 
 	pluginv1 "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginproto/continuum/plugin/v1"
@@ -70,7 +71,7 @@ func TestConfigure_ParsesAllFields(t *testing.T) {
 		"database_url":           "postgres://x",
 		"library_paths":          []any{"/srv/audiobooks", "/mnt/library"},
 		"standalone_http_listen": ":7879",
-		"stream_signing_secret":  "base64secret",
+		"stream_signing_secret":  base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef")),
 	}))
 	if err != nil {
 		t.Fatalf("Configure: %v", err)
@@ -84,7 +85,7 @@ func TestConfigure_ParsesAllFields(t *testing.T) {
 	if got.StandaloneHTTPListen != ":7879" {
 		t.Errorf("StandaloneHTTPListen = %q", got.StandaloneHTTPListen)
 	}
-	if got.StreamSigningSecret != "base64secret" {
+	if got.StreamSigningSecret == "" {
 		t.Errorf("StreamSigningSecret = %q", got.StreamSigningSecret)
 	}
 }
@@ -98,5 +99,24 @@ func TestConfigure_RejectsStandaloneWithoutSecret(t *testing.T) {
 	}))
 	if err == nil {
 		t.Fatal("expected error: standalone_http_listen without stream_signing_secret")
+	}
+}
+
+func TestConfigure_RejectsInvalidStreamSigningSecret(t *testing.T) {
+	s := pluginrt.New(nil, func(c pluginrt.Config) error { return nil })
+	_, err := s.Configure(context.Background(), newConfigureRequest(t, map[string]any{
+		"database_url":           "postgres://x",
+		"standalone_http_listen": ":7879",
+		"stream_signing_secret":  "not-base64",
+	}))
+	if err == nil {
+		t.Fatal("expected invalid stream_signing_secret error")
+	}
+}
+
+func TestDecodeStreamSigningSecret_Requires32Bytes(t *testing.T) {
+	raw := base64.StdEncoding.EncodeToString([]byte("short"))
+	if _, err := pluginrt.DecodeStreamSigningSecret(raw); err == nil {
+		t.Fatal("expected length error")
 	}
 }

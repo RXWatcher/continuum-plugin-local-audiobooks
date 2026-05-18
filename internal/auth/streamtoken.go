@@ -29,6 +29,12 @@ func VerifyStreamToken(secret []byte, token string, expectedBookID string, expec
 	if len(secret) == 0 {
 		return nil, errors.New("empty signing secret")
 	}
+	if expectedBookID == "" {
+		return nil, errors.New("expected book_id required")
+	}
+	if expectedFileIdx < 0 {
+		return nil, errors.New("expected file_idx must be non-negative")
+	}
 	parsed, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
 		// Restrict to HS256; reject "none" and asymmetric algs.
 		if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
@@ -51,9 +57,12 @@ func VerifyStreamToken(secret []byte, token string, expectedBookID string, expec
 		return nil, fmt.Errorf("book_id mismatch (token=%q want=%q)", bookID, expectedBookID)
 	}
 	fidx, ok := claims["file_idx"].(float64)
-	if !ok || int(fidx) != expectedFileIdx {
+	if !ok || fidx != float64(expectedFileIdx) {
 		return nil, fmt.Errorf("file_idx mismatch")
 	}
 	sub, _ := claims["sub"].(string)
+	if sub == "" {
+		return nil, errors.New("sub required")
+	}
 	return &StreamClaims{UserID: sub, BookID: bookID, FileIdx: expectedFileIdx}, nil
 }

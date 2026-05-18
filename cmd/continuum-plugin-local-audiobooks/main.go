@@ -197,7 +197,10 @@ func main() {
 		// Standalone listener: only /api/v1/file/{id} and
 		// /api/v1/cover/{id}/{size} answer, both stream-token-gated.
 		if cfg.StandaloneHTTPListen != "" {
-			secret := []byte(cfg.StreamSigningSecret)
+			secret, err := pluginrt.DecodeStreamSigningSecret(cfg.StreamSigningSecret)
+			if err != nil {
+				return fmt.Errorf("decode stream_signing_secret: %w", err)
+			}
 			standaloneSrv := server.New(server.Deps{
 				Store:        st,
 				StandaloneOn: true,

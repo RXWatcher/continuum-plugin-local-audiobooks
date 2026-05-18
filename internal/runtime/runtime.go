@@ -5,6 +5,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"sync"
@@ -85,6 +86,11 @@ func (s *Server) Configure(_ context.Context, req *pluginv1.ConfigureRequest) (*
 	if cfg.StandaloneHTTPListen != "" && cfg.StreamSigningSecret == "" {
 		return nil, errors.New("stream_signing_secret is required when standalone_http_listen is set")
 	}
+	if cfg.StreamSigningSecret != "" {
+		if _, err := DecodeStreamSigningSecret(cfg.StreamSigningSecret); err != nil {
+			return nil, fmt.Errorf("stream_signing_secret: %w", err)
+		}
+	}
 	// Apply defaults for metadata fields.
 	if cfg.MetadataDefaultRegion == "" {
 		cfg.MetadataDefaultRegion = "us"
@@ -119,6 +125,21 @@ func (s *Server) Configure(_ context.Context, req *pluginv1.ConfigureRequest) (*
 	s.cfg = cfg
 	s.mu.Unlock()
 	return &pluginv1.ConfigureResponse{}, nil
+}
+
+// DecodeStreamSigningSecret decodes the operator-provided base64 HMAC secret.
+// The manifest documents this as a 32-byte base64 value shared with the
+// audiobooks portal; accepting arbitrary text here would make the two plugins
+// easy to misconfigure and weakens entropy expectations.
+func DecodeStreamSigningSecret(raw string) ([]byte, error) {
+	secret, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil {
+		return nil, err
+	}
+	if len(secret) != 32 {
+		return nil, fmt.Errorf("decoded secret must be 32 bytes")
+	}
+	return secret, nil
 }
 
 // Snapshot returns the most recently applied Config.
