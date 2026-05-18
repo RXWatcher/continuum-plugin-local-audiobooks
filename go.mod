@@ -2,10 +2,8 @@ module github.com/ContinuumApp/continuum-plugin-local-audiobooks
 
 go 1.26.0
 
-replace github.com/ContinuumApp/continuum-plugin-sdk => /opt/continuum_plugins/continuum-plugin-sdk
-
 require (
-	github.com/ContinuumApp/continuum-plugin-sdk v0.3.8
+	github.com/ContinuumApp/continuum-plugin-sdk v0.3.10
 	github.com/abema/go-mp4 v1.5.0
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/go-chi/chi/v5 v5.2.5
