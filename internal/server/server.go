@@ -63,6 +63,8 @@ func (s *Server) Handler() http.Handler {
 	r.Get("/api/v1/cover/{id}/{size}", s.handleCover)
 	r.Get("/api/v1/file/{id}", s.handleFile)
 	r.Get("/api/v1/requests/{externalId}", s.handleRequestsStub)
+	r.Get("/admin", s.handleAdminHome)
+	r.Get("/admin/", s.handleAdminHome)
 	r.Post("/admin/scan", s.handleAdminScan)
 	r.Get("/admin/scan/status", s.handleAdminScanStatus)
 	r.Get("/admin/library-paths", s.handleAdminListPaths)
@@ -70,4 +72,19 @@ func (s *Server) Handler() http.Handler {
 	r.Delete("/admin/library-paths/{id}", s.handleAdminDeletePath)
 	r.Post("/admin/metadata/backfill", s.handleMetadataBackfill)
 	return r
+}
+
+func (s *Server) handleAdminHome(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(`<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Local Audiobooks</title></head>
+<body style="font-family:system-ui,sans-serif;margin:32px;line-height:1.5;background:#111;color:#eee">
+<h1>Local Audiobooks</h1>
+<p>Local audiobook library source, scanner, metadata enrichment, cover, and file routes.</p>
+<ul>
+<li><a style="color:#8ab4f8" href="./admin/scan/status">Scan status</a></li>
+<li><a style="color:#8ab4f8" href="./admin/library-paths">Library paths</a></li>
+</ul>
+</body></html>`))
 }

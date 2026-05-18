@@ -53,6 +53,15 @@
       "access": "authenticated"
     },
     {
+      "id": "admin_root",
+      "method": "GET",
+      "path": "/admin",
+      "access": "admin",
+      "navigable": true,
+      "navigation_label": "Local Audiobooks",
+      "navigation_kind": "admin"
+    },
+    {
       "id": "admin",
       "method": "*",
       "path": "/admin/*",
