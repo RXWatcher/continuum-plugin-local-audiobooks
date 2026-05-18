@@ -60,3 +60,28 @@ func TestAdminErrorsUseJSONEnvelope(t *testing.T) {
 		})
 	}
 }
+
+func TestAdminHomeIncludesOperationalSectionsAndMountGuidance(t *testing.T) {
+	h := New(Deps{}).Handler()
+	req := httptest.NewRequest(http.MethodGet, "/admin?theme=midnight-cinema", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`data-tab-target="libraries"`,
+		`data-tab-target="scans"`,
+		`data-tab-target="metadata"`,
+		`data-tab-target="diagnostics"`,
+		`Paths are validated inside the plugin container`,
+		`id="diagnostics"`,
+		`data-theme="midnight-cinema"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("admin home missing %q", want)
+		}
+	}
+}
