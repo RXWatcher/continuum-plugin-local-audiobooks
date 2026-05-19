@@ -61,6 +61,7 @@ func main() {
 		standaloneAddr   atomic.Value // string
 		standaloneSrvPtr atomic.Pointer[http.Server]
 		cfgPtr           atomic.Pointer[pluginrt.Config]
+		appCfgPtr        atomic.Pointer[store.AppConfig]
 		workerPtr        atomic.Pointer[metadata.EnrichmentWorker]
 		queuePtr         atomic.Pointer[metadata.Queue]
 		cachePtr         atomic.Pointer[metadata.Cache]
@@ -104,7 +105,7 @@ func main() {
 		// Inline enrichment: drain the just-enqueued jobs synchronously when
 		// scan_inline_enrich is enabled. Best-effort: drain errors are logged
 		// but do not fail the scan.
-		if c := cfgPtr.Load(); c != nil && c.ScanInlineEnrich {
+		if c := appCfgPtr.Load(); c != nil && c.ScanInlineEnrich {
 			if w := workerPtr.Load(); w != nil {
 				if drainErr := w.Drain(ctx); drainErr != nil {
 					logger.Warn("inline enrichment drain", "err", drainErr)
@@ -132,6 +133,52 @@ func main() {
 	schedSrv := scheduler.New(tasks)
 
 	metaSrv := &metadataprovider.Server{}
+	configureMetadata := func(p *pgxpool.Pool, st *store.Store, appCfg store.AppConfig) {
+		ua := "continuum-local-audiobooks/" + manifest.GetVersion()
+		reg := sources.NewRegistry()
+		reg.Register(sources.NewAudnexus(ua))
+		reg.Register(sources.NewAudiMeta(ua))
+		reg.Register(sources.NewITunes(ua))
+		reg.Register(sources.NewStorytel(ua))
+		reg.Register(sources.NewBookBeat(ua))
+		reg.Register(sources.NewAudioteka(ua))
+		reg.Register(sources.NewAudiobookCovers(ua))
+
+		ttl := time.Duration(appCfg.MetadataCacheTTLDays) * 24 * time.Hour
+		cache := metadata.NewCache(p, ttl)
+		cachePtr.Store(cache)
+		aggRegAdapter := newAggregatorRegistryAdapter(reg)
+		agg := metadata.NewAggregator(aggRegAdapter, cache, appCfg.MetadataRateLimitRPS)
+
+		q := metadata.NewQueue(p)
+		workerRegAdapter := newWorkerRegistryAdapter(reg)
+		worker := metadata.NewEnrichmentWorker(q, st, workerRegAdapter,
+			appCfg.MetadataScanSource, appCfg.MetadataDefaultRegion, logger)
+
+		queuePtr.Store(q)
+		workerPtr.Store(worker)
+
+		enabledFn := func() map[string]bool {
+			m := map[string]bool{}
+			if c := appCfgPtr.Load(); c != nil {
+				for _, id := range c.MetadataSourcesEnabled {
+					m[id] = true
+				}
+			}
+			return m
+		}
+		regionFn := func() string {
+			if c := appCfgPtr.Load(); c != nil {
+				return c.MetadataDefaultRegion
+			}
+			return "us"
+		}
+
+		metaSrv.SetAggregator(agg)
+		metaSrv.SetRegistry(reg)
+		metaSrv.SetEnabled(enabledFn)
+		metaSrv.SetRegion(regionFn)
+	}
 
 	rt := pluginrt.New(manifest, func(cfg pluginrt.Config) error {
 		ctx := context.Background()
@@ -152,6 +199,16 @@ func main() {
 			return fmt.Errorf("migrate: %w", err)
 		}
 		st := store.New(p)
+		if _, err := st.ImportLegacyAppConfig(ctx, appConfigFromRuntimeConfig(cfg)); err != nil {
+			p.Close()
+			return fmt.Errorf("import legacy app config: %w", err)
+		}
+		appCfg, err := st.GetAppConfig(ctx)
+		if err != nil {
+			p.Close()
+			return fmt.Errorf("load app config: %w", err)
+		}
+		appCfgPtr.Store(&appCfg)
 
 		// Sync configured library_paths into the table.
 		for _, path := range cfg.LibraryPaths {
@@ -160,30 +217,8 @@ func main() {
 			}
 		}
 
-		// Metadata wiring — build queue first so it can be passed to the HTTP server.
-		ua := "continuum-local-audiobooks/" + manifest.GetVersion()
-		reg := sources.NewRegistry()
-		reg.Register(sources.NewAudnexus(ua))
-		reg.Register(sources.NewAudiMeta(ua))
-		reg.Register(sources.NewITunes(ua))
-		reg.Register(sources.NewStorytel(ua))
-		reg.Register(sources.NewBookBeat(ua))
-		reg.Register(sources.NewAudioteka(ua))
-		reg.Register(sources.NewAudiobookCovers(ua))
-
-		ttl := time.Duration(cfg.MetadataCacheTTLDays) * 24 * time.Hour
-		cache := metadata.NewCache(p, ttl)
-		cachePtr.Store(cache)
-		aggRegAdapter := newAggregatorRegistryAdapter(reg)
-		agg := metadata.NewAggregator(aggRegAdapter, cache, cfg.MetadataRateLimitRPS)
-
-		q := metadata.NewQueue(p)
-		workerRegAdapter := newWorkerRegistryAdapter(reg)
-		worker := metadata.NewEnrichmentWorker(q, st, workerRegAdapter,
-			cfg.MetadataScanSource, cfg.MetadataDefaultRegion, logger)
-
-		queuePtr.Store(q)
-		workerPtr.Store(worker)
+		configureMetadata(p, st, appCfg)
+		q := queuePtr.Load()
 
 		// Host-proxy HTTP server: serves /api/v1/* (catalog/browse/cover/file)
 		// and /admin/* (CRUD + scan + metadata backfill).
@@ -196,8 +231,8 @@ func main() {
 
 		// Standalone listener: only /api/v1/file/{id} and
 		// /api/v1/cover/{id}/{size} answer, both stream-token-gated.
-		if cfg.StandaloneHTTPListen != "" {
-			secret, err := pluginrt.DecodeStreamSigningSecret(cfg.StreamSigningSecret)
+		if appCfg.StandaloneHTTPListen != "" {
+			secret, err := pluginrt.DecodeStreamSigningSecret(appCfg.StreamSigningSecret)
 			if err != nil {
 				return fmt.Errorf("decode stream_signing_secret: %w", err)
 			}
@@ -207,7 +242,7 @@ func main() {
 				StreamSecret: secret,
 			})
 			httpStandalone.SetHandler(standaloneSrv.Handler())
-			addr := cfg.StandaloneHTTPListen
+			addr := appCfg.StandaloneHTTPListen
 			started := false
 			standaloneOnce.Do(func() {
 				started = true
@@ -245,32 +280,9 @@ func main() {
 		cfgCopy := cfg
 		cfgPtr.Store(&cfgCopy)
 
-		// gRPC server reads enabledFn/regionFn at request time so config
-		// changes take effect without a restart.
-		enabledFn := func() map[string]bool {
-			m := map[string]bool{}
-			if c := cfgPtr.Load(); c != nil {
-				for _, id := range c.MetadataSourcesEnabled {
-					m[id] = true
-				}
-			}
-			return m
-		}
-		regionFn := func() string {
-			if c := cfgPtr.Load(); c != nil {
-				return c.MetadataDefaultRegion
-			}
-			return "us"
-		}
-
-		metaSrv.SetAggregator(agg)
-		metaSrv.SetRegistry(reg)
-		metaSrv.SetEnabled(enabledFn)
-		metaSrv.SetRegion(regionFn)
-
 		logger.Info("configured",
 			"library_paths", cfg.LibraryPaths,
-			"standalone", cfg.StandaloneHTTPListen != "")
+			"standalone", appCfg.StandaloneHTTPListen != "")
 		return nil
 	})
 
@@ -313,4 +325,17 @@ func hydrateRuntimeManifest(manifest *pluginv1.PluginManifest) error {
 		manifest.SupportedPlatforms = []*pluginv1.SupportedPlatform{{Os: goruntime.GOOS, Arch: goruntime.GOARCH}}
 	}
 	return nil
+}
+
+func appConfigFromRuntimeConfig(cfg pluginrt.Config) store.AppConfig {
+	return store.AppConfig{
+		MetadataSourcesEnabled: append([]string(nil), cfg.MetadataSourcesEnabled...),
+		MetadataDefaultRegion:  cfg.MetadataDefaultRegion,
+		MetadataCacheTTLDays:   cfg.MetadataCacheTTLDays,
+		MetadataRateLimitRPS:   cfg.MetadataRateLimitRPS,
+		ScanInlineEnrich:       cfg.ScanInlineEnrich,
+		MetadataScanSource:     cfg.MetadataScanSource,
+		StandaloneHTTPListen:   cfg.StandaloneHTTPListen,
+		StreamSigningSecret:    cfg.StreamSigningSecret,
+	}.WithDefaults()
 }

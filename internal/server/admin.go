@@ -64,6 +64,37 @@ func (s *Server) handleAdminDeletePath(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s *Server) handleAdminGetConfig(w http.ResponseWriter, r *http.Request) {
+	cfg, err := s.deps.Store.GetAppConfig(r.Context())
+	if err != nil {
+		writeAdminError(w, http.StatusInternalServerError, "store_error", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, cfg)
+}
+
+func (s *Server) handleAdminPutConfig(w http.ResponseWriter, r *http.Request) {
+	var cfg store.AppConfig
+	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		writeAdminError(w, http.StatusBadRequest, "invalid_input", err.Error())
+		return
+	}
+	cfg = cfg.WithDefaults()
+	if cfg.StandaloneHTTPListen != "" && cfg.StreamSigningSecret == "" {
+		writeAdminError(w, http.StatusBadRequest, "invalid_input", "stream_signing_secret is required when standalone_http_listen is set")
+		return
+	}
+	if err := cfg.Validate(); err != nil {
+		writeAdminError(w, http.StatusBadRequest, "invalid_input", err.Error())
+		return
+	}
+	if err := s.deps.Store.PutAppConfig(r.Context(), cfg); err != nil {
+		writeAdminError(w, http.StatusInternalServerError, "store_error", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, cfg)
+}
+
 func (s *Server) handleAdminScan(w http.ResponseWriter, r *http.Request) {
 	if s.deps.Scan == nil {
 		writeAdminError(w, http.StatusServiceUnavailable, "not_configured", "scan not configured")

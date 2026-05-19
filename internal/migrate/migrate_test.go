@@ -24,10 +24,10 @@ func TestMigrate0002Applies(t *testing.T) {
 	defer pool.Close()
 	var n int
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM information_schema.tables
-        WHERE table_name IN ('metadata_cache','metadata_enrichment_job')`).Scan(&n); err != nil {
+        WHERE table_name IN ('metadata_cache','metadata_enrichment_job','app_config')`).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 2 {
-		t.Fatalf("expected 2 new tables, found %d", n)
+	if n != 3 {
+		t.Fatalf("expected 3 configured tables, found %d", n)
 	}
 }
