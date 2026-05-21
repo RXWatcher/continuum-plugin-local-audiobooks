@@ -10,8 +10,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/metadata"
-	"github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/metadata/sources"
+	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/metadata"
+	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/metadata/sources"
 )
 
 // -- aggregatorRegistryAdapter --

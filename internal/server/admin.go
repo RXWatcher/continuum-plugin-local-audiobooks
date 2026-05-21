@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/store"
+	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/store"
 )
 
 func (s *Server) handleAdminListPaths(w http.ResponseWriter, r *http.Request) {

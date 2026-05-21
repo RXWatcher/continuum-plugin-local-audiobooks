@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/metadata"
+	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/metadata"
 )
 
 const audimetaID = "audimeta"

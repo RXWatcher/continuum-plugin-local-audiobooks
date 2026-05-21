@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/metadata"
+	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/metadata"
 )
 
 const audnexusID = "audnexus"

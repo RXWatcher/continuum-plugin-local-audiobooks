@@ -23,16 +23,16 @@ import (
 	publicmanifest "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginsdk/manifest"
 	sdkruntime "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginsdk/runtime"
 
-	"github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/grpc/metadataprovider"
-	"github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/httproutes"
-	"github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/metadata"
-	"github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/metadata/sources"
-	"github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/migrate"
-	pluginrt "github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/runtime"
-	"github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/scanner"
-	"github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/scheduler"
-	"github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/server"
-	"github.com/ContinuumApp/continuum-plugin-local-audiobooks/internal/store"
+	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/grpc/metadataprovider"
+	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/httproutes"
+	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/metadata"
+	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/metadata/sources"
+	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/migrate"
+	pluginrt "github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/runtime"
+	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/scanner"
+	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/scheduler"
+	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/server"
+	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/store"
 )
 
 //go:embed manifest.json
