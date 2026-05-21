@@ -28,13 +28,15 @@
     {
       "type": "http_routes.v1",
       "id": "api",
-      "display_name": "Catalog + admin HTTP routes"
+      "display_name": "Catalog + admin HTTP routes",
+      "description": "Catalog endpoints serve the local library to the audiobooks portal; admin endpoints manage mounts, scan triggers, and metadata diagnostics."
     },
     {
       "type": "scheduled_task.v1",
       "id": "library_scan",
       "display_name": "Periodic library rescan",
-      "cron": "0 */6 * * *"
+      "cron": "0 */6 * * *",
+      "description": "Walks configured library directories and upserts discovered audiobooks."
     },
     {
       "type": "metadata_provider.v1",
@@ -51,7 +53,8 @@
       "type": "scheduled_task.v1",
       "id": "metadata_enrichment_worker",
       "display_name": "Metadata enrichment worker",
-      "cron": "* * * * *"
+      "cron": "* * * * *",
+      "description": "Fills missing audiobook metadata by querying the bundled aggregator providers."
     }
   ],
   "http_routes": [
