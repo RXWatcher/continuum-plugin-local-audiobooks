@@ -3,7 +3,7 @@ package scanner
 import (
 	"context"
 
-	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/store"
+	"github.com/RXWatcher/silo-plugin-local-audiobooks/internal/store"
 )
 
 // StoreAdapter wraps *store.Store to satisfy ScanStore. Lives in the

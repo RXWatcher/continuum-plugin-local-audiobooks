@@ -6,7 +6,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/auth"
+	"github.com/RXWatcher/silo-plugin-local-audiobooks/internal/auth"
 )
 
 func mint(t *testing.T, secret []byte, claims jwt.MapClaims) string {

@@ -1,11 +1,11 @@
-# Setup and debugging — continuum-plugin-local-audiobooks
+# Setup and debugging — silo-plugin-local-audiobooks
 
 Operator-only plugin. The README and `operations.md` cover the happy
 path. This document focuses on first-time bring-up and the symptoms
 that show up when something goes wrong.
 
-Plugin ID: `continuum.local-audiobooks`
-Manifest version: see `cmd/continuum-plugin-local-audiobooks/manifest.json`.
+Plugin ID: `silo.local-audiobooks`
+Manifest version: see `cmd/silo-plugin-local-audiobooks/manifest.json`.
 
 ## First-time setup checklist
 
@@ -115,7 +115,7 @@ On the standalone listener only `/api/v1/stream/...` and
   base64 value. Decoded length must be exactly 32 bytes.
 - Reverse proxy is rewriting the `?token=` query param, or stripping
   the path before `/api/v1/`.
-- The reverse proxy is sending `X-Continuum-*` headers to the public
+- The reverse proxy is sending `X-Silo-*` headers to the public
   port — the standalone listener strips them, but if the proxy is also
   the host proxy you may see admin/auth-flavored bugs.
 - The listener address changed without a restart. `standalone_http_listen`
@@ -177,7 +177,7 @@ upstream stabilises.
 
 ## Verifying after changes
 
-1. Restart the plugin installation from the Continuum admin.
+1. Restart the plugin installation from the Silo admin.
 2. Open `/admin` on this plugin and check the status strip: paths,
    last scan, stream secret, active scan.
 3. Trigger a scan, wait, and confirm it completes via

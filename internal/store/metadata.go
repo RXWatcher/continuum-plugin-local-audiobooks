@@ -3,7 +3,7 @@ package store
 import (
 	"context"
 
-	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/metadata"
+	"github.com/RXWatcher/silo-plugin-local-audiobooks/internal/metadata"
 )
 
 // UpdateAudiobookMetadata writes metadata fields onto an audiobook row.

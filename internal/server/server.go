@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/store"
+	"github.com/RXWatcher/silo-plugin-local-audiobooks/internal/store"
 )
 
 // EnrichmentQueue is the surface the server needs from metadata.Queue.
@@ -145,7 +145,7 @@ loadStatus();loadPaths();loadConfig();
 }
 
 func adminTheme(r *http.Request) string {
-	theme := r.Header.Get("X-Continuum-Theme")
+	theme := r.Header.Get("X-Silo-Theme")
 	if theme == "" {
 		theme = r.URL.Query().Get("theme")
 	}

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/scanner"
+	"github.com/RXWatcher/silo-plugin-local-audiobooks/internal/scanner"
 )
 
 // scanFakeStore is a minimal in-memory test double for the scanner's store

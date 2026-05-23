@@ -12,7 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/migrate/files"
+	"github.com/RXWatcher/silo-plugin-local-audiobooks/internal/migrate/files"
 )
 
 const bookkeepingDDL = `

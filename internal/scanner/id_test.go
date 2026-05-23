@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/scanner"
+	"github.com/RXWatcher/silo-plugin-local-audiobooks/internal/scanner"
 )
 
 func TestStableID_ChangesWithSize(t *testing.T) {

@@ -24,21 +24,21 @@ func TestServeHTTPBeforeSetHandlerReturns503(t *testing.T) {
 	}
 }
 
-func TestServeHTTPStripsContinuumHeaders(t *testing.T) {
+func TestServeHTTPStripsSiloHeaders(t *testing.T) {
 	var seen http.Header
 	srv := NewServer()
 	srv.SetHandler(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		seen = r.Header.Clone()
 	}))
 	req := httptest.NewRequest(http.MethodGet, "/x", nil)
-	req.Header.Set("X-Continuum-User-Id", "forged")
-	req.Header.Set("X-Continuum-User-Role", "admin")
-	req.Header.Set("x-continuum-theme", "dark") // lowercase variant
+	req.Header.Set("X-Silo-User-Id", "forged")
+	req.Header.Set("X-Silo-User-Role", "admin")
+	req.Header.Set("x-silo-theme", "dark") // lowercase variant
 	req.Header.Set("Authorization", "Bearer keep-me")
 	req.Header.Set("X-Forwarded-For", "1.2.3.4")
 	srv.ServeHTTP(httptest.NewRecorder(), req)
 	for k := range seen {
-		if strings.HasPrefix(strings.ToLower(k), "x-continuum-") {
+		if strings.HasPrefix(strings.ToLower(k), "x-silo-") {
 			t.Errorf("header %q leaked through to handler", k)
 		}
 	}

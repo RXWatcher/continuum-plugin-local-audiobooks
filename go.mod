@@ -1,4 +1,4 @@
-module github.com/RXWatcher/continuum-plugin-local-audiobooks
+module github.com/RXWatcher/silo-plugin-local-audiobooks
 
 go 1.26.0
 

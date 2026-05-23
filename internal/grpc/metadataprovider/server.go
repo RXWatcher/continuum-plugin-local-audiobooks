@@ -10,13 +10,13 @@ import (
 	"regexp"
 	"sync/atomic"
 
-	pluginv1 "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginproto/continuum/plugin/v1"
+	pluginv1 "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginproto/silo/plugin/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/metadata"
-	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/metadata/sources"
+	"github.com/RXWatcher/silo-plugin-local-audiobooks/internal/metadata"
+	"github.com/RXWatcher/silo-plugin-local-audiobooks/internal/metadata/sources"
 )
 
 var reHTMLTag = regexp.MustCompile(`<[^>]+>`)

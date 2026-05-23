@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/metadata"
+	"github.com/RXWatcher/silo-plugin-local-audiobooks/internal/metadata"
 )
 
 // SoftLimit on response body size to cap surprise payloads.

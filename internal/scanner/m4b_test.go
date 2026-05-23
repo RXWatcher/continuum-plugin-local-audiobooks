@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/RXWatcher/continuum-plugin-local-audiobooks/internal/scanner"
+	"github.com/RXWatcher/silo-plugin-local-audiobooks/internal/scanner"
 )
 
 // fixtureM4B returns the path to a fixture; the file is checked into

@@ -1,6 +1,6 @@
 // Package auth verifies presigned stream-URL JWTs minted by the audiobooks
 // portal. The same shared HMAC secret signs and verifies; portal-side
-// minting lives in continuum-plugin-audiobooks.
+// minting lives in silo-plugin-audiobooks.
 package auth
 
 import (

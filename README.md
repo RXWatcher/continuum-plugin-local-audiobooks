@@ -1,6 +1,6 @@
-# Local Audiobooks for Continuum
+# Local Audiobooks for Silo
 
-`continuum.local-audiobooks` is the local-filesystem audiobook backend for the [Continuum](https://github.com/ContinuumApp/continuum) plugin ecosystem. It walks configured library directories for `.m4b` and `.mp3` files, persists their metadata and embedded/sidecar covers into a dedicated Postgres schema, and serves the resulting catalog, browse trees, covers, and byte-range streams to the [`continuum.audiobooks`](https://github.com/RXWatcher/continuum-plugin-audiobooks) portal. It also bundles a metadata aggregator that searches seven upstream sources to fill in titles, authors, narrators, descriptions, and artwork.
+`silo.local-audiobooks` is the local-filesystem audiobook backend for the [Silo](https://github.com/ContinuumApp/silo) plugin ecosystem. It walks configured library directories for `.m4b` and `.mp3` files, persists their metadata and embedded/sidecar covers into a dedicated Postgres schema, and serves the resulting catalog, browse trees, covers, and byte-range streams to the [`silo.audiobooks`](https://github.com/RXWatcher/silo-plugin-audiobooks) portal. It also bundles a metadata aggregator that searches seven upstream sources to fill in titles, authors, narrators, descriptions, and artwork.
 
 ## Category
 
@@ -18,9 +18,9 @@ Lives under **Books / Audiobooks** in the admin sidebar.
 
 ## Dependencies
 
-- Host: [`github.com/ContinuumApp/continuum`](https://github.com/ContinuumApp/continuum).
+- Host: [`github.com/ContinuumApp/silo`](https://github.com/ContinuumApp/silo).
 - SDK: [`github.com/ContinuumApp/continuum-plugin-sdk`](https://github.com/ContinuumApp/continuum-plugin-sdk).
-- Consumed by [`continuum-plugin-audiobooks`](https://github.com/RXWatcher/continuum-plugin-audiobooks) (the portal), which presents the local library alongside other backends such as [`continuum-plugin-bookwarehouse-audio`](https://github.com/RXWatcher/continuum-plugin-bookwarehouse-audio) and request providers like [`continuum-plugin-audiobook-requests`](https://github.com/RXWatcher/continuum-plugin-audiobook-requests).
+- Consumed by [`silo-plugin-audiobooks`](https://github.com/RXWatcher/silo-plugin-audiobooks) (the portal), which presents the local library alongside other backends such as [`silo-plugin-bookwarehouse-audio`](https://github.com/RXWatcher/silo-plugin-bookwarehouse-audio) and request providers like [`silo-plugin-audiobook-requests`](https://github.com/RXWatcher/silo-plugin-audiobook-requests).
 
 ## External services
 
@@ -47,7 +47,7 @@ Lives under **Books / Audiobooks** in the admin sidebar.
 Example DSN:
 
 ```text
-postgres://plugin_local_audiobooks:password@postgres:5432/continuum?search_path=local_audiobooks&sslmode=disable
+postgres://plugin_local_audiobooks:password@postgres:5432/silo?search_path=local_audiobooks&sslmode=disable
 ```
 
 ## Metadata providers
@@ -76,4 +76,4 @@ make build
 make test
 ```
 
-CI builds linux-amd64 binaries on push to main via the reusable workflow in [RXWatcher/continuum-plugin-repository](https://github.com/RXWatcher/continuum-plugin-repository) and publishes them to the catalog at [`./binaries/`](https://github.com/RXWatcher/continuum-plugin-repository/tree/main/binaries).
+CI builds linux-amd64 binaries on push to main via the reusable workflow in [RXWatcher/silo-plugin-repository](https://github.com/RXWatcher/silo-plugin-repository) and publishes them to the catalog at [`./binaries/`](https://github.com/RXWatcher/silo-plugin-repository/tree/main/binaries).

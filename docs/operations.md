@@ -1,4 +1,4 @@
-# Operations runbook — continuum-plugin-local-audiobooks
+# Operations runbook — silo-plugin-local-audiobooks
 
 Operator-only plugin. The README covers manifest, capabilities, config
 keys, and the source list. This runbook covers the day-to-day workflows
@@ -20,7 +20,7 @@ The DSN must set `search_path=local_audiobooks` so migrations target the
 right namespace. Example:
 
 ```text
-postgres://plugin_local_audiobooks:<pwd>@db.internal:5432/continuum?search_path=local_audiobooks&sslmode=disable
+postgres://plugin_local_audiobooks:<pwd>@db.internal:5432/silo?search_path=local_audiobooks&sslmode=disable
 ```
 
 Migrations are idempotent and tracked in `schema_migration` inside that
@@ -196,7 +196,7 @@ other index returns 404.
 
 - The host-proxy gRPC `Handle` path and the standalone `ServeHTTP` path
   share the same chi router but the standalone path strips every
-  `X-Continuum-*` header before invoking the handler, so a malicious
+  `X-Silo-*` header before invoking the handler, so a malicious
   client cannot spoof host-trust headers via the public listener.
 - Tokens are HS256 JWTs with audience `audiobook_backend`, claims
   `sub`, `book_id`, `file_idx`, and required `exp`. The aud/book/idx

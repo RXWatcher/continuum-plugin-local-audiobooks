@@ -2,7 +2,7 @@
 // gRPC service. The plugin host invokes our gRPC service for each inbound
 // HTTP request; we replay against the wrapped handler and return its
 // response. ServeHTTP exposes the same handler to a standalone HTTP
-// listener with X-Continuum-* header stripping (security: host-trust
+// listener with X-Silo-* header stripping (security: host-trust
 // headers cannot reach handlers from the public listener).
 package httproutes
 
@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	pluginv1 "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginproto/continuum/plugin/v1"
+	pluginv1 "github.com/ContinuumApp/continuum-plugin-sdk/pkg/pluginproto/silo/plugin/v1"
 )
 
 type Server struct {
@@ -34,7 +34,7 @@ func (s *Server) SetHandler(h http.Handler) {
 	s.handler.Store(&h)
 }
 
-// ServeHTTP is used by the standalone listener. Strips X-Continuum-*
+// ServeHTTP is used by the standalone listener. Strips X-Silo-*
 // headers before invoking the wrapped handler.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	hPtr := s.handler.Load()
@@ -45,7 +45,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for k := range r.Header {
-		if strings.HasPrefix(strings.ToLower(k), "x-continuum-") {
+		if strings.HasPrefix(strings.ToLower(k), "x-silo-") {
 			r.Header.Del(k)
 		}
 	}
